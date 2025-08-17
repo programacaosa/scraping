@@ -1,14 +1,14 @@
 // index.js
 // Extrai preços da LATAM e exibe em uma interface web simples.
 
-const fs = require('fs');
-const path = require('path');
 const puppeteer = require('puppeteer');
 const express = require('express');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+let dadosExtraidos = 'Coleta ainda não realizada.';
 
 function timestamp() {
   const d = new Date();
@@ -74,9 +74,6 @@ async function extraiPrecosVisiveis(page) {
 
 async function coletarDados() {
   const url = 'https://www.latamairlines.com/br/pt';
-  const outDir = path.join(__dirname, 'outputs');
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-  const outFile = path.join(outDir, `latam-precos-${timestamp()}.txt`);
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -106,21 +103,21 @@ async function coletarDados() {
       `URL: ${url}`,
       ''.padEnd(60, '=')
     ];
-    const conteudo = header.concat(linhas).join('\n');
-    fs.writeFileSync(outFile, conteudo, 'utf8');
+    dadosExtraidos = header.concat(linhas).join('\n');
 
-    console.log(`Arquivo salvo: ${outFile}`);
+    console.log('Dados extraídos com sucesso!');
   } catch (err) {
-    console.error('Erro na coleta:', err.message);
+    dadosExtraidos = `Erro na coleta: ${err.message}`;
+    console.error(dadosExtraidos);
   } finally {
     await browser.close();
   }
 }
 
-// Roda a coleta ao iniciar
+// Executa a coleta ao iniciar
 coletarDados();
 
-// Serve o HTML e os dados
+// Interface HTML
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -153,17 +150,14 @@ app.get('/', (req, res) => {
   `);
 });
 
+// Rota para exibir os dados extraídos
 app.get('/dados', (req, res) => {
-  const arquivos = fs.readdirSync(path.join(__dirname, 'outputs'))
-    .filter(f => f.endsWith('.txt'))
-    .sort()
-    .reverse();
+  res.type('text/plain').send(dadosExtraidos);
+});
 
-  if (!arquivos.length) return res.send('Nenhum arquivo encontrado.');
-
-  const ultimo = path.join(__dirname, 'outputs', arquivos[0]);
-  const conteudo = fs.readFileSync(ultimo, 'utf8');
-  res.type('text/plain').send(conteudo);
+// Rota opcional para favicon
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
 });
 
 app.listen(PORT, () => {
