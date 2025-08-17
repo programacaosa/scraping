@@ -1,11 +1,14 @@
 // index.js
-// Guia simples para extrair preços visíveis na página inicial da LATAM e salvar em TXT.
-// Observação: o site muda com frequência; ajuste seletores/regex se necessário.
+// Extrai preços da LATAM e exibe em uma interface web simples.
 
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const express = require('express');
 require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 function timestamp() {
   const d = new Date();
@@ -15,7 +18,6 @@ function timestamp() {
 
 async function aceitaCookiesSeAparecer(page) {
   try {
-    // Tenta encontrar botões comuns de consentimento
     const xpaths = [
       "//button[contains(., 'Aceitar')]",
       "//button[contains(., 'Aceito')]",
@@ -30,16 +32,12 @@ async function aceitaCookiesSeAparecer(page) {
         break;
       }
     }
-  } catch {
-    // Ignora se não achar
-  }
+  } catch {}
 }
 
 async function extraiPrecosVisiveis(page) {
-  // Regex para preços no padrão brasileiro e BRL
   const priceRegex = /(\bR\$|\bBRL)\s?\d{1,3}(\.\d{3})*,\d{2}/g;
 
-  // Busca em blocos grandes de conteúdo para achar preços “com contexto”
   const offers = await page.evaluate((pricePattern) => {
     const data = [];
     const blocks = Array.from(document.querySelectorAll('section, article, li, div'));
@@ -48,16 +46,14 @@ async function extraiPrecosVisiveis(page) {
       if (!text) continue;
       const matches = text.match(new RegExp(pricePattern));
       if (matches && matches.length) {
-        // Pega algumas primeiras linhas como "título/contexto"
         const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
         const header = lines.slice(0, 3).join(' | ').slice(0, 200);
         data.push({
           contexto: header,
-          precos: Array.from(new Set(matches)) // remove duplicados dentro do bloco
+          precos: Array.from(new Set(matches))
         });
       }
     }
-    // Remove itens redundantes por contexto
     const seen = new Set();
     return data.filter(item => {
       const key = item.contexto + '|' + item.precos.join(',');
@@ -67,7 +63,6 @@ async function extraiPrecosVisiveis(page) {
     });
   }, priceRegex.source);
 
-  // Achata em linhas legíveis
   const linhas = [];
   offers.forEach((of, idx) => {
     linhas.push(`Oferta ${idx + 1}: ${of.contexto}`);
@@ -77,14 +72,14 @@ async function extraiPrecosVisiveis(page) {
   return linhas;
 }
 
-async function main() {
+async function coletarDados() {
   const url = 'https://www.latamairlines.com/br/pt';
   const outDir = path.join(__dirname, 'outputs');
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, `latam-precos-${timestamp()}.txt`);
 
   const browser = await puppeteer.launch({
-    headless: true,               // coloque false para ver o navegador funcionando
+    headless: true,
     args: ['--lang=pt-BR'],
     defaultViewport: { width: 1366, height: 900 }
   });
@@ -98,10 +93,7 @@ async function main() {
 
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
     await aceitaCookiesSeAparecer(page);
-
-    // Pequena espera extra para conteúdos dinâmicos
     await new Promise(r => setTimeout(r, 2000));
-
 
     const linhas = await extraiPrecosVisiveis(page);
 
@@ -109,7 +101,6 @@ async function main() {
       linhas.push('Nenhum preço encontrado automaticamente na página inicial. Tente rodar com headless: false e ajustar seletores/regex.');
     }
 
-    // Salva no TXT
     const header = [
       `Coleta LATAM - ${new Date().toLocaleString('pt-BR')}`,
       `URL: ${url}`,
@@ -126,4 +117,55 @@ async function main() {
   }
 }
 
-main();
+// Roda a coleta ao iniciar
+coletarDados();
+
+// Serve o HTML e os dados
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Preços LATAM</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+        h1 { color: #d62828; }
+        pre { background: #fff; padding: 15px; border: 1px solid #ccc; overflow-x: auto; }
+      </style>
+    </head>
+    <body>
+      <h1>Preços extraídos da LATAM</h1>
+      <pre id="dados">Carregando dados...</pre>
+      <script>
+        fetch('/dados')
+          .then(res => res.text())
+          .then(texto => {
+            document.getElementById('dados').textContent = texto;
+          })
+          .catch(err => {
+            document.getElementById('dados').textContent = 'Erro ao carregar os dados.';
+            console.error(err);
+          });
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/dados', (req, res) => {
+  const arquivos = fs.readdirSync(path.join(__dirname, 'outputs'))
+    .filter(f => f.endsWith('.txt'))
+    .sort()
+    .reverse();
+
+  if (!arquivos.length) return res.send('Nenhum arquivo encontrado.');
+
+  const ultimo = path.join(__dirname, 'outputs', arquivos[0]);
+  const conteudo = fs.readFileSync(ultimo, 'utf8');
+  res.type('text/plain').send(conteudo);
+});
+
+app.listen(PORT, () => {
+  console.log(`Interface disponível em http://localhost:${PORT}`);
+});
