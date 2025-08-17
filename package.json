@@ -1,0 +1,23 @@
+{
+  "name": "automacao",
+  "version": "1.0.0",
+  "description": "Projeto Node.js para automatizar a busca de preços da LATAM e salvar em arquivo .txt",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nodejs",
+    "automacao",
+    "puppeteer",
+    "scraper",
+    "passagens"
+  ],
+  "author": "Azevedo",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "puppeteer": "^22.15.0"
+  }
+}
