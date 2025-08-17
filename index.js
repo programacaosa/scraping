@@ -75,9 +75,8 @@ async function extraiPrecosVisiveis(page) {
 async function coletarDados() {
   const url = 'https://www.latamairlines.com/br/pt';
 
-  const browser = await puppeteer.launch({
+ const browser = await puppeteer.launch({
   headless: true,
-  executablePath: puppeteer.executablePath(), // usa o Chromium baixado no postinstall
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
@@ -85,7 +84,6 @@ async function coletarDados() {
   ],
   defaultViewport: { width: 1366, height: 900 }
 });
-
 
   try {
     const page = await browser.newPage();
@@ -169,4 +167,5 @@ app.get('/favicon.ico', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Interface disponível em http://localhost:${PORT}`);
 });
+
 
