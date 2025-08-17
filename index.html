@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Preços LATAM</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+    h1 { color: #d62828; }
+    pre { background: #fff; padding: 15px; border: 1px solid #ccc; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Preços extraídos da LATAM</h1>
+  <pre id="dados">Carregando dados...</pre>
+
+  <script>
+    fetch('/dados')
+      .then(res => res.text())
+      .then(texto => {
+        document.getElementById('dados').textContent = texto;
+      })
+      .catch(err => {
+        document.getElementById('dados').textContent = 'Erro ao carregar os dados.';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>
